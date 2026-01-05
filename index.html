@@ -1,0 +1,1418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Wcowin's Gesture Christmas Tree - 用手势控制的3D圣诞树">
+    <meta name="author" content="Wcowin">
+    <title>🎄 Gesture Christmas Tree | Wcowin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --gold: #ffd700;
+        --gold-light: #ffe566;
+        --gold-dark: #b8860b;
+        --red: #dc143c;
+        --green: #228b22;
+        --green-dark: #0d3d0d;
+        --bg-dark: #0a0a0f;
+        --bg-card: rgba(10, 10, 15, 0.88);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        overflow: hidden;
+        background: var(--bg-dark);
+        font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+        color: #fff;
+        user-select: none;
+      }
+
+      /* 画布 */
+      #canvas-container {
+        width: 100vw;
+        height: 100vh;
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+      }
+
+      /* UI层 */
+      #ui-layer {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        pointer-events: none;
+        transition: opacity 0.4s ease;
+      }
+
+      #ui-layer.hidden {
+        opacity: 0;
+      }
+
+      /* 加载动画 */
+      #loader {
+        position: fixed;
+        inset: 0;
+        background: radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a0f 100%);
+        z-index: 100;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 1s ease-out;
+      }
+
+      .loader-tree {
+        font-size: 64px;
+        animation: bounce 1s ease-in-out infinite;
+      }
+
+      @keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+      }
+
+      .loader-text {
+        color: var(--gold);
+        font-size: 14px;
+        letter-spacing: 4px;
+        margin-top: 20px;
+        text-transform: uppercase;
+        font-weight: 300;
+      }
+
+      .loader-bar {
+        width: 200px;
+        height: 2px;
+        background: rgba(255, 215, 0, 0.2);
+        margin-top: 16px;
+        border-radius: 2px;
+        overflow: hidden;
+      }
+
+      .loader-bar::after {
+        content: '';
+        display: block;
+        width: 40%;
+        height: 100%;
+        background: var(--gold);
+        animation: loading 1.2s ease-in-out infinite;
+      }
+
+      @keyframes loading {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(350%); }
+      }
+
+      /* 顶部标题 */
+      .header {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        padding: 24px 32px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        pointer-events: none;
+      }
+
+      .brand {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .brand-title {
+        font-family: 'Cinzel', serif;
+        font-size: clamp(20px, 3vw, 28px);
+        font-weight: 600;
+        background: linear-gradient(135deg, #fff 0%, var(--gold) 50%, var(--gold-dark) 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .brand-title .tree-icon {
+        font-size: 1.2em;
+        filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.5));
+      }
+
+      .brand-author {
+        font-size: 11px;
+        color: rgba(255, 215, 0, 0.6);
+        letter-spacing: 2px;
+        padding-left: 2px;
+        text-decoration: none;
+        transition: color 0.3s ease;
+        pointer-events: auto;
+      }
+
+      .brand-author:hover {
+        color: var(--gold);
+      }
+
+      /* 右上角操作区 */
+      .actions {
+        display: flex;
+        gap: 12px;
+        pointer-events: auto;
+      }
+
+      .btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--bg-card);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 215, 0, 0.25);
+        color: var(--gold);
+        padding: 10px 18px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+      }
+
+      .btn:hover {
+        background: rgba(255, 215, 0, 0.12);
+        border-color: var(--gold);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(255, 215, 0, 0.15);
+      }
+
+      .btn .icon {
+        font-size: 16px;
+      }
+
+      #file-input {
+        display: none;
+      }
+
+      /* 左侧控制面板 */
+      .control-panel {
+        position: absolute;
+        top: 100px;
+        left: 24px;
+        background: var(--bg-card);
+        backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 215, 0, 0.15);
+        border-radius: 16px;
+        padding: 20px;
+        width: 260px;
+        pointer-events: auto;
+        transition: all 0.3s ease;
+      }
+
+      .control-panel:hover {
+        border-color: rgba(255, 215, 0, 0.3);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      }
+
+      .panel-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--gold);
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(255, 215, 0, 0.15);
+      }
+
+      .gesture-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .gesture-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 10px;
+        transition: background 0.2s ease;
+      }
+
+      .gesture-item:hover {
+        background: rgba(255, 215, 0, 0.08);
+      }
+
+      .gesture-item.active {
+        background: rgba(255, 215, 0, 0.15);
+        border: 1px solid rgba(255, 215, 0, 0.3);
+      }
+
+      .gesture-icon {
+        font-size: 28px;
+        width: 40px;
+        text-align: center;
+      }
+
+      .gesture-info {
+        flex: 1;
+      }
+
+      .gesture-name {
+        font-size: 13px;
+        font-weight: 500;
+        color: #fff;
+      }
+
+      .gesture-desc {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.5);
+        margin-top: 2px;
+      }
+
+      .panel-footer {
+        margin-top: 16px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 215, 0, 0.1);
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.4);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .panel-footer kbd {
+        background: rgba(255, 215, 0, 0.15);
+        color: var(--gold);
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-family: monospace;
+      }
+
+      /* 底部状态栏 */
+      .status-bar {
+        position: absolute;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        background: var(--bg-card);
+        backdrop-filter: blur(20px);
+        padding: 12px 24px;
+        border-radius: 50px;
+        border: 1px solid rgba(255, 215, 0, 0.2);
+        pointer-events: none;
+      }
+
+      .status-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #666;
+        transition: all 0.3s ease;
+      }
+
+      .status-dot.active {
+        background: #4ade80;
+        box-shadow: 0 0 12px rgba(74, 222, 128, 0.6);
+      }
+
+      .status-label {
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      .status-value {
+        color: #fff;
+        font-weight: 500;
+      }
+
+      .mode-tag {
+        background: linear-gradient(135deg, var(--gold-dark), var(--gold));
+        color: #000;
+        padding: 4px 14px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 1px;
+      }
+
+      /* 摄像头预览 */
+      #webcam-wrapper {
+        position: absolute;
+        bottom: 24px;
+        right: 24px;
+        width: 200px;
+        height: 150px;
+        background: var(--bg-card);
+        border: 1px solid rgba(255, 215, 0, 0.3);
+        border-radius: 12px;
+        overflow: hidden;
+        pointer-events: none;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      }
+
+      .webcam-header {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        padding: 8px 12px;
+        background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, transparent 100%);
+        font-size: 10px;
+        color: var(--gold);
+        letter-spacing: 1px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        z-index: 2;
+      }
+
+      .webcam-header .rec-dot {
+        width: 6px;
+        height: 6px;
+        background: #ef4444;
+        border-radius: 50%;
+        animation: blink 1s infinite;
+      }
+
+      @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+      }
+
+      #webcam-preview {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      /* 照片管理面板 */
+      #photo-manager {
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 10, 15, 0.95);
+        backdrop-filter: blur(30px);
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        opacity: 1;
+        transition: opacity 0.3s ease;
+      }
+
+      #photo-manager.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .manager-content {
+        text-align: center;
+        max-width: 90%;
+      }
+
+      .manager-title {
+        font-family: 'Cinzel', serif;
+        font-size: 32px;
+        color: var(--gold);
+        margin-bottom: 8px;
+      }
+
+      .manager-subtitle {
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.5);
+        margin-bottom: 32px;
+      }
+
+      #photo-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 16px;
+        max-width: 600px;
+        max-height: 55vh;
+        overflow-y: auto;
+        padding: 20px;
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .photo-item {
+        position: relative;
+        aspect-ratio: 1;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 2px solid rgba(255, 215, 0, 0.3);
+        background: rgba(0, 0, 0, 0.5);
+        transition: all 0.3s ease;
+        cursor: pointer;
+      }
+
+      .photo-item:hover {
+        border-color: var(--gold);
+        transform: scale(1.03);
+      }
+
+      .photo-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .photo-delete {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 26px;
+        height: 26px;
+        background: rgba(220, 38, 38, 0.9);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 14px;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .photo-item:hover .photo-delete {
+        opacity: 1;
+      }
+
+      .empty-photos {
+        padding: 48px;
+        color: rgba(255, 255, 255, 0.4);
+        text-align: center;
+      }
+
+      .empty-photos .icon {
+        font-size: 48px;
+        margin-bottom: 12px;
+      }
+
+      .manager-close {
+        margin-top: 28px;
+        background: transparent;
+        border: 1px solid rgba(255, 215, 0, 0.3);
+        color: var(--gold);
+        padding: 12px 36px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.3s ease;
+      }
+
+      .manager-close:hover {
+        background: rgba(255, 215, 0, 0.1);
+        border-color: var(--gold);
+      }
+
+      /* 雪花效果 */
+      .snowflakes {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 5;
+        overflow: hidden;
+      }
+
+      .snowflake {
+        position: absolute;
+        top: -20px;
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 16px;
+        animation: fall linear infinite;
+      }
+
+      @keyframes fall {
+        to {
+          transform: translateY(100vh) rotate(360deg);
+        }
+      }
+
+      /* 响应式 */
+      @media (max-width: 768px) {
+        .control-panel {
+          display: none;
+        }
+
+        .header {
+          padding: 16px;
+        }
+
+        .brand-title {
+          font-size: 18px;
+        }
+
+        .actions {
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .btn {
+          padding: 8px 14px;
+          font-size: 12px;
+        }
+
+        #webcam-wrapper {
+          width: 140px;
+          height: 105px;
+          bottom: 100px;
+        }
+
+        .status-bar {
+          bottom: 16px;
+          padding: 10px 16px;
+          gap: 10px;
+        }
+      }
+    </style>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./assets/three.module.js",
+          "three/addons/postprocessing/EffectComposer.js": "./assets/EffectComposer.js",
+          "three/addons/postprocessing/RenderPass.js": "./assets/RenderPass.js",
+          "three/addons/postprocessing/UnrealBloomPass.js": "./assets/UnrealBloomPass.js",
+          "three/addons/environments/RoomEnvironment.js": "./assets/RoomEnvironment.js",
+          "@mediapipe/tasks-vision": "./assets/mediapipe-vision.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <!-- 加载动画 -->
+    <div id="loader">
+      <div class="loader-tree">🎄</div>
+      <div class="loader-text">Loading Christmas Magic</div>
+      <div class="loader-bar"></div>
+    </div>
+
+    <!-- 雪花背景 -->
+    <div class="snowflakes" id="snowflakes"></div>
+
+    <!-- 3D画布 -->
+    <div id="canvas-container"></div>
+
+    <!-- UI层 -->
+    <div id="ui-layer">
+      <!-- 顶部 -->
+      <header class="header">
+        <div class="brand">
+          <div class="brand-title">
+            <span class="tree-icon">🎄</span>
+            Gesture Christmas Tree
+          </div>
+          <a href="https://wcowin.work/" target="_blank" class="brand-author">by Wcowin</a>
+        </div>
+        
+        <div class="actions">
+          <label class="btn">
+            <span class="icon">📷</span>
+            <span>上传照片</span>
+            <input type="file" id="file-input" multiple accept="image/*" />
+          </label>
+          <button class="btn" id="manage-btn">
+            <span class="icon">🖼️</span>
+            <span>管理</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- 控制面板 -->
+      <div class="control-panel">
+        <div class="panel-title">
+          <span>🎮</span>
+          手势控制指南
+        </div>
+        <div class="gesture-list">
+          <div class="gesture-item" data-mode="TREE">
+            <span class="gesture-icon">👊</span>
+            <div class="gesture-info">
+              <div class="gesture-name">握拳</div>
+              <div class="gesture-desc">聚合成圣诞树</div>
+            </div>
+          </div>
+          <div class="gesture-item" data-mode="SCATTER">
+            <span class="gesture-icon">🖐️</span>
+            <div class="gesture-info">
+              <div class="gesture-name">张开手掌</div>
+              <div class="gesture-desc">粒子散开飘浮</div>
+            </div>
+          </div>
+          <div class="gesture-item" data-mode="FOCUS">
+            <span class="gesture-icon">🤏</span>
+            <div class="gesture-info">
+              <div class="gesture-name">捏夹手势</div>
+              <div class="gesture-desc">聚焦查看照片</div>
+            </div>
+          </div>
+        </div>
+        <div class="panel-footer">
+          <kbd>H</kbd> 隐藏界面
+        </div>
+      </div>
+
+      <!-- 状态栏 -->
+      <div class="status-bar">
+        <div class="status-item">
+          <div class="status-dot" id="hand-dot"></div>
+          <span class="status-label">手势:</span>
+          <span class="status-value" id="hand-status">等待中</span>
+        </div>
+        <div class="mode-tag" id="mode-tag">🎄 树形</div>
+      </div>
+
+      <!-- 摄像头 -->
+      <div id="webcam-wrapper">
+        <div class="webcam-header">
+          <span class="rec-dot"></span>
+          手势追踪
+        </div>
+        <video id="webcam" autoplay muted playsinline style="display:none"></video>
+        <canvas id="webcam-preview"></canvas>
+      </div>
+    </div>
+
+    <!-- 照片管理 -->
+    <div id="photo-manager" class="hidden">
+      <div class="manager-content">
+        <h2 class="manager-title">📸 照片管理</h2>
+        <p class="manager-subtitle">你的照片会融入圣诞树粒子中</p>
+        <div id="photo-grid"></div>
+        <button class="manager-close" id="close-manager">关闭</button>
+      </div>
+    </div>
+
+
+    <script type="module">
+      import * as THREE from 'three'
+      import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
+      import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
+      import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
+      import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
+      import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision'
+
+      // ========== 配置 ==========
+      const CONFIG = {
+        colors: {
+          bg: 0x0a0a0f,
+          gold: 0xffd700,
+          darkGreen: 0x0d3d0d,
+          red: 0xdc143c,
+        },
+        particles: {
+          count: 1200,      // 稍微减少以提升性能
+          dustCount: 1800,
+          treeHeight: 24,
+          treeRadius: 8,
+        },
+        camera: { z: 50 },
+        gesture: {
+          fistThreshold: 0.18,
+          pinchThreshold: 0.08,
+          openThreshold: 0.35,
+          debounceTime: 150,  // 防抖时间(ms)
+        }
+      }
+
+      // ========== 状态 ==========
+      const STATE = {
+        mode: 'TREE',
+        focusTarget: null,
+        hand: { detected: false, x: 0, y: 0 },
+        rotation: { x: 0, y: 0 },
+        lastModeChange: 0,  // 用于防抖
+      }
+
+      // ========== 全局变量 ==========
+      let scene, camera, renderer, composer, mainGroup
+      const clock = new THREE.Clock()
+      const particleSystem = []
+      const photoMeshGroup = new THREE.Group()
+      let handLandmarker, video, webcamCanvas, webcamCtx
+
+      // 复用的向量对象（避免每帧创建）
+      const _tempVec3 = new THREE.Vector3()
+      const _tempScale = new THREE.Vector3()
+
+      // ========== 初始化 ==========
+      async function init() {
+        createSnowflakes()
+        initThree()
+        setupEnvironment()
+        setupLights()
+        createParticles()
+        createDust()
+        createDefaultPhoto()
+        setupPostProcessing()
+        setupEvents()
+        await initMediaPipe()
+
+        // 隐藏加载
+        setTimeout(() => {
+          const loader = document.getElementById('loader')
+          loader.style.opacity = 0
+          setTimeout(() => loader.remove(), 1000)
+        }, 500)
+
+        animate()
+      }
+
+      // 创建雪花
+      function createSnowflakes() {
+        const container = document.getElementById('snowflakes')
+        const flakes = ['❄', '❅', '❆', '✦', '✧']
+        
+        for (let i = 0; i < 30; i++) {
+          const flake = document.createElement('div')
+          flake.className = 'snowflake'
+          flake.textContent = flakes[Math.floor(Math.random() * flakes.length)]
+          flake.style.left = Math.random() * 100 + '%'
+          flake.style.fontSize = (8 + Math.random() * 12) + 'px'
+          flake.style.opacity = 0.3 + Math.random() * 0.5
+          flake.style.animationDuration = (8 + Math.random() * 12) + 's'
+          flake.style.animationDelay = Math.random() * 10 + 's'
+          container.appendChild(flake)
+        }
+      }
+
+      function initThree() {
+        const container = document.getElementById('canvas-container')
+        
+        scene = new THREE.Scene()
+        scene.background = new THREE.Color(CONFIG.colors.bg)
+        scene.fog = new THREE.FogExp2(CONFIG.colors.bg, 0.01)
+
+        camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 1000)
+        camera.position.set(0, 2, CONFIG.camera.z)
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
+        renderer.setSize(window.innerWidth, window.innerHeight)
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+        renderer.toneMapping = THREE.ReinhardToneMapping
+        renderer.toneMappingExposure = 2.2
+        container.appendChild(renderer.domElement)
+
+        mainGroup = new THREE.Group()
+        scene.add(mainGroup)
+      }
+
+      function setupEnvironment() {
+        const pmremGenerator = new THREE.PMREMGenerator(renderer)
+        scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture
+      }
+
+      function setupLights() {
+        // 环境光
+        scene.add(new THREE.AmbientLight(0xffffff, 0.4))
+
+        // 树内部暖光
+        const innerLight = new THREE.PointLight(0xffaa00, 3, 30)
+        innerLight.position.set(0, 5, 0)
+        mainGroup.add(innerLight)
+
+        // 顶部星星光
+        const starLight = new THREE.PointLight(0xffdd00, 2, 15)
+        starLight.position.set(0, CONFIG.particles.treeHeight / 2 + 2, 0)
+        mainGroup.add(starLight)
+
+        // 主聚光灯 - 金色
+        const spotGold = new THREE.SpotLight(0xffcc66, 1500)
+        spotGold.position.set(30, 45, 40)
+        spotGold.angle = 0.5
+        spotGold.penumbra = 0.6
+        scene.add(spotGold)
+
+        // 侧面蓝光
+        const spotBlue = new THREE.SpotLight(0x4488ff, 800)
+        spotBlue.position.set(-35, 25, -30)
+        spotBlue.angle = 0.6
+        spotBlue.penumbra = 0.5
+        scene.add(spotBlue)
+
+        // 背面补光
+        const backLight = new THREE.SpotLight(0xff6666, 400)
+        backLight.position.set(0, 10, -40)
+        scene.add(backLight)
+
+        // 正面柔光
+        const frontLight = new THREE.DirectionalLight(0xffeedd, 0.8)
+        frontLight.position.set(0, 10, 50)
+        scene.add(frontLight)
+      }
+
+      function setupPostProcessing() {
+        const renderScene = new RenderPass(scene, camera)
+        const bloomPass = new UnrealBloomPass(
+          new THREE.Vector2(window.innerWidth, window.innerHeight),
+          1.5, 0.4, 0.85
+        )
+        bloomPass.threshold = 0.5
+        bloomPass.strength = 0.7
+        bloomPass.radius = 0.6
+
+        composer = new EffectComposer(renderer)
+        composer.addPass(renderScene)
+        composer.addPass(bloomPass)
+      }
+
+      // ========== 粒子系统 ==========
+      class Particle {
+        constructor(mesh, type, isDust = false) {
+          this.mesh = mesh
+          this.type = type
+          this.isDust = isDust
+          this.posTree = new THREE.Vector3()
+          this.posScatter = new THREE.Vector3()
+          this.baseScale = mesh.scale.x
+
+          const speedMult = type === 'PHOTO' ? 0.25 : 1.8
+          this.spinSpeed = new THREE.Vector3(
+            (Math.random() - 0.5) * speedMult,
+            (Math.random() - 0.5) * speedMult,
+            (Math.random() - 0.5) * speedMult
+          )
+          this.calculatePositions()
+        }
+
+        calculatePositions() {
+          const h = CONFIG.particles.treeHeight
+          let t = Math.pow(Math.random(), 0.8)
+          const y = t * h - h / 2
+          let rMax = CONFIG.particles.treeRadius * (1.0 - t)
+          if (rMax < 0.5) rMax = 0.5
+          const angle = t * 50 * Math.PI + Math.random() * Math.PI
+          const r = rMax * (0.8 + Math.random() * 0.4)
+          this.posTree.set(Math.cos(angle) * r, y, Math.sin(angle) * r)
+
+          const rScatter = this.isDust ? 12 + Math.random() * 20 : 8 + Math.random() * 12
+          const theta = Math.random() * Math.PI * 2
+          const phi = Math.acos(2 * Math.random() - 1)
+          this.posScatter.set(
+            rScatter * Math.sin(phi) * Math.cos(theta),
+            rScatter * Math.sin(phi) * Math.sin(theta),
+            rScatter * Math.cos(phi)
+          )
+        }
+
+        update(dt, mode, focusTarget) {
+          let target = this.posTree
+
+          if (mode === 'SCATTER') {
+            target = this.posScatter
+          } else if (mode === 'FOCUS' && this.mesh === focusTarget) {
+            _tempVec3.set(0, 2, 35)
+            const invMatrix = new THREE.Matrix4().copy(mainGroup.matrixWorld).invert()
+            target = _tempVec3.applyMatrix4(invMatrix)
+          } else if (mode === 'FOCUS') {
+            target = this.posScatter
+          }
+
+          const lerpSpeed = mode === 'FOCUS' && this.mesh === focusTarget ? 5.0 : 2.0
+          this.mesh.position.lerp(target, lerpSpeed * dt)
+
+          if (mode === 'SCATTER') {
+            this.mesh.rotation.x += this.spinSpeed.x * dt
+            this.mesh.rotation.y += this.spinSpeed.y * dt
+            this.mesh.rotation.z += this.spinSpeed.z * dt
+          } else if (mode === 'TREE') {
+            this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, 0, dt)
+            this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, 0, dt)
+            this.mesh.rotation.y += 0.5 * dt
+          }
+
+          if (mode === 'FOCUS' && this.mesh === focusTarget) {
+            this.mesh.lookAt(camera.position)
+          }
+
+          let s = this.baseScale
+          if (this.isDust) {
+            s = this.baseScale * (0.8 + 0.4 * Math.sin(clock.elapsedTime * 4 + this.mesh.id))
+            if (mode === 'TREE') s = 0
+          } else if (mode === 'SCATTER' && this.type === 'PHOTO') {
+            s = this.baseScale * 2.5
+          } else if (mode === 'FOCUS') {
+            s = this.mesh === focusTarget ? 4.5 : this.baseScale * 0.8
+          }
+
+          _tempScale.setScalar(s)
+          this.mesh.scale.lerp(_tempScale, 4 * dt)
+        }
+      }
+
+      function createParticles() {
+        // 几何体
+        const sphereGeo = new THREE.SphereGeometry(0.5, 32, 32)
+        const boxGeo = new THREE.BoxGeometry(0.45, 0.45, 0.45)
+        const diamondGeo = new THREE.OctahedronGeometry(0.4, 0)
+        const coneGeo = new THREE.ConeGeometry(0.3, 0.6, 8)
+        
+        // 糖果棒
+        const curve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0, -0.5, 0),
+          new THREE.Vector3(0, 0.3, 0),
+          new THREE.Vector3(0.1, 0.5, 0),
+          new THREE.Vector3(0.3, 0.4, 0),
+        ])
+        const candyGeo = new THREE.TubeGeometry(curve, 16, 0.07, 8, false)
+
+        // 糖果纹理
+        const candyCanvas = document.createElement('canvas')
+        candyCanvas.width = candyCanvas.height = 128
+        const ctx = candyCanvas.getContext('2d')
+        ctx.fillStyle = '#fff'
+        ctx.fillRect(0, 0, 128, 128)
+        ctx.fillStyle = '#cc0000'
+        for (let i = -128; i < 256; i += 32) {
+          ctx.beginPath()
+          ctx.moveTo(i, 0)
+          ctx.lineTo(i + 32, 128)
+          ctx.lineTo(i + 16, 128)
+          ctx.lineTo(i - 16, 0)
+          ctx.fill()
+        }
+        const candyTex = new THREE.CanvasTexture(candyCanvas)
+        candyTex.wrapS = candyTex.wrapT = THREE.RepeatWrapping
+        candyTex.repeat.set(3, 3)
+
+        // 材质 - 更丰富的颜色
+        const materials = {
+          gold: new THREE.MeshStandardMaterial({
+            color: 0xffd700, metalness: 1, roughness: 0.1,
+            envMapIntensity: 2.5, emissive: 0x553300, emissiveIntensity: 0.4
+          }),
+          silver: new THREE.MeshStandardMaterial({
+            color: 0xc0c0c0, metalness: 1, roughness: 0.1,
+            envMapIntensity: 2, emissive: 0x333333, emissiveIntensity: 0.2
+          }),
+          green: new THREE.MeshStandardMaterial({
+            color: 0x1a5c1a, metalness: 0.3, roughness: 0.6,
+            emissive: 0x0a3a0a, emissiveIntensity: 0.3
+          }),
+          darkGreen: new THREE.MeshStandardMaterial({
+            color: 0x0d3d0d, metalness: 0.2, roughness: 0.8,
+            emissive: 0x002200, emissiveIntensity: 0.2
+          }),
+          red: new THREE.MeshPhysicalMaterial({
+            color: 0xdc143c, metalness: 0.4, roughness: 0.2,
+            clearcoat: 1, emissive: 0x440000, emissiveIntensity: 0.3
+          }),
+          blue: new THREE.MeshPhysicalMaterial({
+            color: 0x4169e1, metalness: 0.4, roughness: 0.2,
+            clearcoat: 1, emissive: 0x000044, emissiveIntensity: 0.3
+          }),
+          purple: new THREE.MeshPhysicalMaterial({
+            color: 0x9932cc, metalness: 0.4, roughness: 0.2,
+            clearcoat: 1, emissive: 0x220033, emissiveIntensity: 0.3
+          }),
+          white: new THREE.MeshStandardMaterial({
+            color: 0xffffff, metalness: 0.1, roughness: 0.3,
+            emissive: 0x444444, emissiveIntensity: 0.2
+          }),
+          candy: new THREE.MeshStandardMaterial({ map: candyTex, roughness: 0.3 }),
+        }
+
+        // 创建粒子 - 更多种类
+        for (let i = 0; i < CONFIG.particles.count; i++) {
+          const rand = Math.random()
+          let mesh, type
+
+          if (rand < 0.25) {
+            // 绿色方块 - 树叶
+            mesh = new THREE.Mesh(boxGeo, Math.random() > 0.5 ? materials.green : materials.darkGreen)
+            type = 'LEAF'
+          } else if (rand < 0.40) {
+            // 金色球 - 装饰球
+            mesh = new THREE.Mesh(sphereGeo, materials.gold)
+            type = 'GOLD_BALL'
+          } else if (rand < 0.50) {
+            // 银色球
+            mesh = new THREE.Mesh(sphereGeo, materials.silver)
+            type = 'SILVER_BALL'
+          } else if (rand < 0.60) {
+            // 红色球
+            mesh = new THREE.Mesh(sphereGeo, materials.red)
+            type = 'RED_BALL'
+          } else if (rand < 0.68) {
+            // 蓝色球
+            mesh = new THREE.Mesh(sphereGeo, materials.blue)
+            type = 'BLUE_BALL'
+          } else if (rand < 0.75) {
+            // 紫色球
+            mesh = new THREE.Mesh(sphereGeo, materials.purple)
+            type = 'PURPLE_BALL'
+          } else if (rand < 0.82) {
+            // 金色钻石
+            mesh = new THREE.Mesh(diamondGeo, materials.gold)
+            type = 'DIAMOND'
+          } else if (rand < 0.88) {
+            // 白色雪花点
+            mesh = new THREE.Mesh(sphereGeo, materials.white)
+            type = 'SNOW'
+          } else if (rand < 0.94) {
+            // 小锥形 - 像小铃铛
+            mesh = new THREE.Mesh(coneGeo, materials.gold)
+            type = 'BELL'
+          } else {
+            // 糖果棒
+            mesh = new THREE.Mesh(candyGeo, materials.candy)
+            type = 'CANE'
+          }
+
+          const s = 0.3 + Math.random() * 0.5
+          mesh.scale.set(s, s, s)
+          mesh.rotation.set(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2)
+          mainGroup.add(mesh)
+          particleSystem.push(new Particle(mesh, type))
+        }
+
+        // 顶部星星 - 更闪亮
+        const starGeo = new THREE.OctahedronGeometry(1.5, 0)
+        const starMat = new THREE.MeshStandardMaterial({
+          color: 0xffee88, 
+          emissive: 0xffcc00, 
+          emissiveIntensity: 2,
+          metalness: 1, 
+          roughness: 0
+        })
+        const star = new THREE.Mesh(starGeo, starMat)
+        star.position.y = CONFIG.particles.treeHeight / 2 + 2
+        star.rotation.y = Math.PI / 4
+        mainGroup.add(star)
+
+        // 添加星星光晕
+        const glowGeo = new THREE.SphereGeometry(2, 16, 16)
+        const glowMat = new THREE.MeshBasicMaterial({
+          color: 0xffdd44,
+          transparent: true,
+          opacity: 0.15
+        })
+        const glow = new THREE.Mesh(glowGeo, glowMat)
+        glow.position.y = CONFIG.particles.treeHeight / 2 + 2
+        mainGroup.add(glow)
+
+        mainGroup.add(photoMeshGroup)
+      }
+
+      function createDust() {
+        // 更多样的灰尘/雪花
+        const shapes = [
+          new THREE.TetrahedronGeometry(0.06, 0),
+          new THREE.OctahedronGeometry(0.05, 0),
+          new THREE.SphereGeometry(0.04, 8, 8)
+        ]
+        
+        const colors = [0xffeedd, 0xffffee, 0xffd700, 0xffffff]
+        
+        for (let i = 0; i < CONFIG.particles.dustCount; i++) {
+          const geo = shapes[Math.floor(Math.random() * shapes.length)]
+          const mat = new THREE.MeshBasicMaterial({ 
+            color: colors[Math.floor(Math.random() * colors.length)], 
+            transparent: true, 
+            opacity: 0.5 + Math.random() * 0.4
+          })
+          const mesh = new THREE.Mesh(geo, mat)
+          mesh.scale.setScalar(0.4 + Math.random() * 0.8)
+          mainGroup.add(mesh)
+          particleSystem.push(new Particle(mesh, 'DUST', true))
+        }
+      }
+
+      function createDefaultPhoto() {
+        const canvas = document.createElement('canvas')
+        canvas.width = canvas.height = 512
+        const ctx = canvas.getContext('2d')
+
+        const gradient = ctx.createLinearGradient(0, 0, 512, 512)
+        gradient.addColorStop(0, '#1a1a2e')
+        gradient.addColorStop(1, '#0d0d15')
+        ctx.fillStyle = gradient
+        ctx.fillRect(0, 0, 512, 512)
+
+        ctx.strokeStyle = '#ffd700'
+        ctx.lineWidth = 10
+        ctx.strokeRect(15, 15, 482, 482)
+
+        ctx.font = '600 42px Cinzel, serif'
+        ctx.fillStyle = '#ffd700'
+        ctx.textAlign = 'center'
+        ctx.fillText('🎄', 256, 180)
+        ctx.fillText('Merry', 256, 260)
+        ctx.fillText('Christmas', 256, 320)
+
+        ctx.font = '300 18px sans-serif'
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.6)'
+        ctx.fillText('by Wcowin', 256, 400)
+
+        const tex = new THREE.CanvasTexture(canvas)
+        tex.colorSpace = THREE.SRGBColorSpace
+        addPhotoToScene(tex)
+      }
+
+      function addPhotoToScene(texture) {
+        const frameGeo = new THREE.BoxGeometry(1.4, 1.4, 0.05)
+        const frameMat = new THREE.MeshStandardMaterial({
+          color: CONFIG.colors.gold, metalness: 1, roughness: 0.1
+        })
+        const frame = new THREE.Mesh(frameGeo, frameMat)
+
+        const photoGeo = new THREE.PlaneGeometry(1.2, 1.2)
+        const photoMat = new THREE.MeshBasicMaterial({ map: texture })
+        const photo = new THREE.Mesh(photoGeo, photoMat)
+        photo.position.z = 0.04
+
+        const group = new THREE.Group()
+        group.add(frame)
+        group.add(photo)
+        group.scale.set(0.8, 0.8, 0.8)
+
+        photoMeshGroup.add(group)
+        particleSystem.push(new Particle(group, 'PHOTO'))
+      }
+
+      function handleImageUpload(e) {
+        Array.from(e.target.files).forEach(file => {
+          const reader = new FileReader()
+          reader.onload = ev => {
+            new THREE.TextureLoader().load(ev.target.result, tex => {
+              tex.colorSpace = THREE.SRGBColorSpace
+              addPhotoToScene(tex)
+            })
+          }
+          reader.readAsDataURL(file)
+        })
+        e.target.value = ''
+      }
+
+
+      // ========== MediaPipe ==========
+      async function initMediaPipe() {
+        video = document.getElementById('webcam')
+        webcamCanvas = document.getElementById('webcam-preview')
+        webcamCtx = webcamCanvas.getContext('2d')
+        webcamCanvas.width = 200
+        webcamCanvas.height = 150
+
+        try {
+          const vision = await FilesetResolver.forVisionTasks('./assets/wasm')
+          handLandmarker = await HandLandmarker.createFromOptions(vision, {
+            baseOptions: { modelAssetPath: './assets/hand_landmarker.task', delegate: 'GPU' },
+            runningMode: 'VIDEO',
+            numHands: 1,
+          })
+        } catch (err) {
+          console.error('MediaPipe初始化失败:', err)
+          updateUI(false, '手势不可用')
+          return
+        }
+
+        if (navigator.mediaDevices?.getUserMedia) {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
+            video.srcObject = stream
+            video.muted = true
+            video.play().then(() => requestAnimationFrame(predictWebcam))
+          } catch (err) {
+            console.error('摄像头访问失败:', err)
+            updateUI(false, '需要摄像头')
+          }
+        }
+      }
+
+      let lastVideoTime = -1
+      function predictWebcam() {
+        if (video.currentTime !== lastVideoTime && handLandmarker) {
+          lastVideoTime = video.currentTime
+          const result = handLandmarker.detectForVideo(video, performance.now())
+          processGestures(result)
+        }
+
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          webcamCtx.drawImage(video, 0, 0, webcamCanvas.width, webcamCanvas.height)
+        }
+        requestAnimationFrame(predictWebcam)
+      }
+
+      function processGestures(result) {
+        if (result.landmarks?.length > 0) {
+          STATE.hand.detected = true
+          const lm = result.landmarks[0]
+          STATE.hand.x = (lm[9].x - 0.5) * 2
+          STATE.hand.y = (lm[9].y - 0.5) * 2
+
+          const thumb = lm[4], index = lm[8], wrist = lm[0], palm = lm[9]
+          const pinchDist = Math.hypot(thumb.x - index.x, thumb.y - index.y)
+
+          const fingerTips = [lm[8], lm[12], lm[16], lm[20]]
+          let fistDist = fingerTips.reduce((sum, tip) => sum + Math.hypot(tip.x - palm.x, tip.y - palm.y), 0) / 4
+          let avgDist = fingerTips.reduce((sum, tip) => sum + Math.hypot(tip.x - wrist.x, tip.y - wrist.y), 0) / 4
+
+          // 检测手势类型
+          let detectedMode = null
+          const { fistThreshold, pinchThreshold, openThreshold } = CONFIG.gesture
+
+          if (fistDist < fistThreshold) {
+            detectedMode = 'TREE'
+          } else if (pinchDist < pinchThreshold && avgDist > 0.22) {
+            detectedMode = 'FOCUS'
+          } else if (avgDist > openThreshold) {
+            detectedMode = 'SCATTER'
+          }
+
+          // 防抖：避免手势频繁切换
+          const now = performance.now()
+          if (detectedMode && detectedMode !== STATE.mode) {
+            if (now - STATE.lastModeChange > CONFIG.gesture.debounceTime) {
+              STATE.lastModeChange = now
+              
+              if (detectedMode === 'FOCUS') {
+                const photos = particleSystem.filter(p => p.type === 'PHOTO')
+                if (photos.length) {
+                  STATE.focusTarget = photos[Math.floor(Math.random() * photos.length)].mesh
+                }
+              } else {
+                STATE.focusTarget = null
+              }
+              
+              STATE.mode = detectedMode
+            }
+          }
+
+          updateUI(true, '已识别')
+        } else {
+          STATE.hand.detected = false
+          updateUI(false, '等待中')
+        }
+      }
+
+      function updateUI(detected, status) {
+        const dot = document.getElementById('hand-dot')
+        const statusEl = document.getElementById('hand-status')
+        const modeTag = document.getElementById('mode-tag')
+
+        dot?.classList.toggle('active', detected)
+        if (statusEl) statusEl.textContent = status
+
+        const modeNames = { TREE: '🎄 树形', SCATTER: '✨ 散开', FOCUS: '🔍 聚焦' }
+        if (modeTag) modeTag.textContent = modeNames[STATE.mode] || STATE.mode
+
+        // 高亮当前手势
+        document.querySelectorAll('.gesture-item').forEach(item => {
+          item.classList.toggle('active', item.dataset.mode === STATE.mode)
+        })
+      }
+
+      // ========== 事件 ==========
+      function setupEvents() {
+        window.addEventListener('resize', () => {
+          camera.aspect = window.innerWidth / window.innerHeight
+          camera.updateProjectionMatrix()
+          renderer.setSize(window.innerWidth, window.innerHeight)
+          composer.setSize(window.innerWidth, window.innerHeight)
+        })
+
+        document.getElementById('file-input').addEventListener('change', handleImageUpload)
+        document.getElementById('manage-btn').addEventListener('click', showPhotoManager)
+        document.getElementById('close-manager').addEventListener('click', hidePhotoManager)
+
+        window.addEventListener('keydown', e => {
+          if (e.key.toLowerCase() === 'h') {
+            document.getElementById('ui-layer').classList.toggle('hidden')
+          }
+        })
+      }
+
+      function showPhotoManager() {
+        updatePhotoGrid()
+        document.getElementById('photo-manager').classList.remove('hidden')
+      }
+
+      function hidePhotoManager() {
+        document.getElementById('photo-manager').classList.add('hidden')
+      }
+
+      function updatePhotoGrid() {
+        const grid = document.getElementById('photo-grid')
+        const photos = particleSystem.filter(p => p.type === 'PHOTO')
+
+        if (!photos.length) {
+          grid.innerHTML = '<div class="empty-photos"><div class="icon">📷</div><p>还没有照片<br>点击上传添加</p></div>'
+          return
+        }
+
+        grid.innerHTML = photos.map((p, i) => {
+          const photoMesh = p.mesh.children[1]
+          const imgUrl = photoMesh?.material?.map?.image?.src || ''
+          return `<div class="photo-item">
+            <img src="${imgUrl}" alt="照片${i + 1}" onerror="this.style.display='none'">
+            <button class="photo-delete" data-index="${i}">×</button>
+          </div>`
+        }).join('')
+
+        grid.querySelectorAll('.photo-delete').forEach(btn => {
+          btn.onclick = () => deletePhoto(parseInt(btn.dataset.index))
+        })
+      }
+
+      function deletePhoto(index) {
+        const photos = particleSystem.filter(p => p.type === 'PHOTO')
+        if (index < 0 || index >= photos.length) return
+
+        const particle = photos[index]
+        particle.mesh.parent?.remove(particle.mesh)
+        photoMeshGroup.remove(particle.mesh)
+        particleSystem.splice(particleSystem.indexOf(particle), 1)
+        updatePhotoGrid()
+      }
+
+      // ========== 动画循环 ==========
+      function animate() {
+        requestAnimationFrame(animate)
+        const dt = clock.getDelta()
+
+        if (STATE.mode === 'SCATTER' && STATE.hand.detected) {
+          STATE.rotation.y += (STATE.hand.x * Math.PI * 0.9 - STATE.rotation.y) * 3 * dt
+          STATE.rotation.x += (STATE.hand.y * Math.PI * 0.25 - STATE.rotation.x) * 3 * dt
+        } else if (STATE.mode === 'TREE') {
+          STATE.rotation.y += 0.25 * dt
+          STATE.rotation.x += (0 - STATE.rotation.x) * 2 * dt
+        } else {
+          STATE.rotation.y += 0.1 * dt
+        }
+
+        mainGroup.rotation.y = STATE.rotation.y
+        mainGroup.rotation.x = STATE.rotation.x
+
+        particleSystem.forEach(p => p.update(dt, STATE.mode, STATE.focusTarget))
+        composer.render()
+      }
+
+      // 启动
+      init()
+    </script>
+  </body>
+</html>

@@ -2,10 +2,6 @@ import {
 	Color
 } from 'three';
 
-/**
- * Luminosity
- * http://en.wikipedia.org/wiki/Luminosity
- */
 
 const LuminosityHighPassShader = {
 

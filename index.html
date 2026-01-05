@@ -758,6 +758,7 @@
       // 复用的向量对象（避免每帧创建）
       const _tempVec3 = new THREE.Vector3()
       const _tempScale = new THREE.Vector3()
+      const _invMatrix = new THREE.Matrix4()
 
       // ========== 初始化 ==========
       async function init() {
@@ -836,7 +837,7 @@
         mainGroup.add(innerLight)
 
         // 顶部星星光
-        const starLight = new THREE.PointLight(0xffdd00, 2, 15)
+        const starLight = new THREE.PointLight(0xffdd00, 1, 10)
         starLight.position.set(0, CONFIG.particles.treeHeight / 2 + 2, 0)
         mainGroup.add(starLight)
 
@@ -921,18 +922,19 @@
 
         update(dt, mode, focusTarget) {
           let target = this.posTree
+          const isFocusTarget = mode === 'FOCUS' && this.mesh === focusTarget
 
           if (mode === 'SCATTER') {
             target = this.posScatter
-          } else if (mode === 'FOCUS' && this.mesh === focusTarget) {
+          } else if (isFocusTarget) {
             _tempVec3.set(0, 2, 35)
-            const invMatrix = new THREE.Matrix4().copy(mainGroup.matrixWorld).invert()
-            target = _tempVec3.applyMatrix4(invMatrix)
+            _invMatrix.copy(mainGroup.matrixWorld).invert()
+            target = _tempVec3.applyMatrix4(_invMatrix)
           } else if (mode === 'FOCUS') {
             target = this.posScatter
           }
 
-          const lerpSpeed = mode === 'FOCUS' && this.mesh === focusTarget ? 5.0 : 2.0
+          const lerpSpeed = isFocusTarget ? 5.0 : 2.0
           this.mesh.position.lerp(target, lerpSpeed * dt)
 
           if (mode === 'SCATTER') {
@@ -945,8 +947,22 @@
             this.mesh.rotation.y += 0.5 * dt
           }
 
-          if (mode === 'FOCUS' && this.mesh === focusTarget) {
+          if (isFocusTarget) {
             this.mesh.lookAt(camera.position)
+            // 聚焦的照片渲染在最前面
+            this.mesh.renderOrder = 999
+            this.mesh.traverse(child => {
+              if (child.material) {
+                child.material.depthTest = false
+              }
+            })
+          } else if (this.type === 'PHOTO') {
+            this.mesh.renderOrder = 0
+            this.mesh.traverse(child => {
+              if (child.material) {
+                child.material.depthTest = true
+              }
+            })
           }
 
           let s = this.baseScale
@@ -956,7 +972,7 @@
           } else if (mode === 'SCATTER' && this.type === 'PHOTO') {
             s = this.baseScale * 2.5
           } else if (mode === 'FOCUS') {
-            s = this.mesh === focusTarget ? 4.5 : this.baseScale * 0.8
+            s = isFocusTarget ? 4.5 : this.baseScale * 0.8
           }
 
           _tempScale.setScalar(s)
@@ -1094,10 +1110,10 @@
         const starGeo = new THREE.OctahedronGeometry(1.5, 0)
         const starMat = new THREE.MeshStandardMaterial({
           color: 0xffee88, 
-          emissive: 0xffcc00, 
-          emissiveIntensity: 2,
+          emissive: 0xffaa00, 
+          emissiveIntensity: 0.6,
           metalness: 1, 
-          roughness: 0
+          roughness: 0.1
         })
         const star = new THREE.Mesh(starGeo, starMat)
         star.position.y = CONFIG.particles.treeHeight / 2 + 2
@@ -1105,11 +1121,11 @@
         mainGroup.add(star)
 
         // 添加星星光晕
-        const glowGeo = new THREE.SphereGeometry(2, 16, 16)
+        const glowGeo = new THREE.SphereGeometry(1.2, 16, 16)
         const glowMat = new THREE.MeshBasicMaterial({
-          color: 0xffdd44,
+          color: 0xffcc33,
           transparent: true,
-          opacity: 0.15
+          opacity: 0.08
         })
         const glow = new THREE.Mesh(glowGeo, glowMat)
         glow.position.y = CONFIG.particles.treeHeight / 2 + 2
@@ -1217,6 +1233,8 @@
         webcamCanvas.width = 200
         webcamCanvas.height = 150
 
+        updateUI(false, '初始化中...')
+
         try {
           const vision = await FilesetResolver.forVisionTasks('./assets/wasm')
           handLandmarker = await HandLandmarker.createFromOptions(vision, {
@@ -1235,7 +1253,14 @@
             const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
             video.srcObject = stream
             video.muted = true
-            video.play().then(() => requestAnimationFrame(predictWebcam))
+            
+            // 等待视频真正准备好
+            await new Promise((resolve) => {
+              video.onloadeddata = resolve
+            })
+            await video.play()
+            
+            updateUI(false, '等待中')
           } catch (err) {
             console.error('摄像头访问失败:', err)
             updateUI(false, '需要摄像头')
@@ -1245,16 +1270,15 @@
 
       let lastVideoTime = -1
       function predictWebcam() {
-        if (video.currentTime !== lastVideoTime && handLandmarker) {
+        if (video && video.currentTime !== lastVideoTime && handLandmarker) {
           lastVideoTime = video.currentTime
           const result = handLandmarker.detectForVideo(video, performance.now())
           processGestures(result)
         }
 
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
           webcamCtx.drawImage(video, 0, 0, webcamCanvas.width, webcamCanvas.height)
         }
-        requestAnimationFrame(predictWebcam)
       }
 
       function processGestures(result) {
@@ -1394,6 +1418,9 @@
         requestAnimationFrame(animate)
         const dt = clock.getDelta()
 
+        // 手势检测整合到主循环
+        predictWebcam()
+
         if (STATE.mode === 'SCATTER' && STATE.hand.detected) {
           STATE.rotation.y += (STATE.hand.x * Math.PI * 0.9 - STATE.rotation.y) * 3 * dt
           STATE.rotation.x += (STATE.hand.y * Math.PI * 0.25 - STATE.rotation.x) * 3 * dt
@@ -1407,7 +1434,14 @@
         mainGroup.rotation.y = STATE.rotation.y
         mainGroup.rotation.x = STATE.rotation.x
 
-        particleSystem.forEach(p => p.update(dt, STATE.mode, STATE.focusTarget))
+        // 使用 for 循环代替 forEach 提升性能
+        const len = particleSystem.length
+        const mode = STATE.mode
+        const focusTarget = STATE.focusTarget
+        for (let i = 0; i < len; i++) {
+          particleSystem[i].update(dt, mode, focusTarget)
+        }
+        
         composer.render()
       }
 

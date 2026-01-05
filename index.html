@@ -719,23 +719,23 @@
       // ========== 配置 ==========
       const CONFIG = {
         colors: {
-          bg: 0x0a0a0f,
+          bg: 0x0a0a12,  // 稍微偏蓝的深色背景
           gold: 0xffd700,
           darkGreen: 0x0d3d0d,
           red: 0xdc143c,
         },
         particles: {
-          count: 1200,      // 稍微减少以提升性能
-          dustCount: 1800,
-          treeHeight: 24,
-          treeRadius: 8,
+          count: 1000,      // 适当减少，让树形更清晰
+          dustCount: 1200,  // 减少灰尘，避免杂乱
+          treeHeight: 22,   // 稍微矮一点更紧凑
+          treeRadius: 7,    // 稍微窄一点更优雅
         },
-        camera: { z: 50 },
+        camera: { z: 45 },  // 拉近一点
         gesture: {
           fistThreshold: 0.18,
           pinchThreshold: 0.08,
           openThreshold: 0.35,
-          debounceTime: 150,  // 防抖时间(ms)
+          debounceTime: 150,
         }
       }
 
@@ -750,6 +750,8 @@
 
       // ========== 全局变量 ==========
       let scene, camera, renderer, composer, mainGroup
+      let topStar, topGlow  // 顶部星星和光晕
+      let innerLight, starLight  // 树内部灯光
       const clock = new THREE.Clock()
       const particleSystem = []
       const photoMeshGroup = new THREE.Group()
@@ -828,41 +830,41 @@
       }
 
       function setupLights() {
-        // 环境光
-        scene.add(new THREE.AmbientLight(0xffffff, 0.4))
+        // 环境光 - 稍微暗一点让对比更强
+        scene.add(new THREE.AmbientLight(0xffffff, 0.3))
 
-        // 树内部暖光
-        const innerLight = new THREE.PointLight(0xffaa00, 3, 30)
-        innerLight.position.set(0, 5, 0)
+        // 树内部暖光 - 柔和一些
+        innerLight = new THREE.PointLight(0xffaa00, 2, 25)
+        innerLight.position.set(0, 4, 0)
         mainGroup.add(innerLight)
 
-        // 顶部星星光
-        const starLight = new THREE.PointLight(0xffdd00, 1, 10)
+        // 顶部星星光 - 柔和
+        starLight = new THREE.PointLight(0xffdd00, 0.8, 8)
         starLight.position.set(0, CONFIG.particles.treeHeight / 2 + 2, 0)
         mainGroup.add(starLight)
 
-        // 主聚光灯 - 金色
-        const spotGold = new THREE.SpotLight(0xffcc66, 1500)
-        spotGold.position.set(30, 45, 40)
+        // 主聚光灯 - 金色，从右上方照射
+        const spotGold = new THREE.SpotLight(0xffcc66, 1200)
+        spotGold.position.set(25, 40, 35)
         spotGold.angle = 0.5
-        spotGold.penumbra = 0.6
+        spotGold.penumbra = 0.7
         scene.add(spotGold)
 
-        // 侧面蓝光
-        const spotBlue = new THREE.SpotLight(0x4488ff, 800)
-        spotBlue.position.set(-35, 25, -30)
+        // 侧面冷光 - 蓝紫色，增加层次感
+        const spotBlue = new THREE.SpotLight(0x6688ff, 500)
+        spotBlue.position.set(-30, 20, -25)
         spotBlue.angle = 0.6
-        spotBlue.penumbra = 0.5
+        spotBlue.penumbra = 0.6
         scene.add(spotBlue)
 
-        // 背面补光
-        const backLight = new THREE.SpotLight(0xff6666, 400)
-        backLight.position.set(0, 10, -40)
+        // 背面补光 - 暖红色轮廓光
+        const backLight = new THREE.SpotLight(0xff8866, 300)
+        backLight.position.set(0, 8, -35)
         scene.add(backLight)
 
-        // 正面柔光
-        const frontLight = new THREE.DirectionalLight(0xffeedd, 0.8)
-        frontLight.position.set(0, 10, 50)
+        // 正面柔光 - 让正面细节可见
+        const frontLight = new THREE.DirectionalLight(0xfff8f0, 0.6)
+        frontLight.position.set(0, 8, 45)
         scene.add(frontLight)
       }
 
@@ -872,9 +874,9 @@
           new THREE.Vector2(window.innerWidth, window.innerHeight),
           1.5, 0.4, 0.85
         )
-        bloomPass.threshold = 0.5
-        bloomPass.strength = 0.7
-        bloomPass.radius = 0.6
+        bloomPass.threshold = 0.6   // 提高阈值，只让最亮的发光
+        bloomPass.strength = 0.5    // 降低强度，更柔和
+        bloomPass.radius = 0.4      // 缩小半径，更精致
 
         composer = new EffectComposer(renderer)
         composer.addPass(renderScene)
@@ -1015,81 +1017,81 @@
         candyTex.wrapS = candyTex.wrapT = THREE.RepeatWrapping
         candyTex.repeat.set(3, 3)
 
-        // 材质 - 更丰富的颜色
+        // 材质 - 更精致的颜色搭配
         const materials = {
           gold: new THREE.MeshStandardMaterial({
-            color: 0xffd700, metalness: 1, roughness: 0.1,
-            envMapIntensity: 2.5, emissive: 0x553300, emissiveIntensity: 0.4
+            color: 0xffd700, metalness: 0.9, roughness: 0.15,
+            envMapIntensity: 2, emissive: 0x442200, emissiveIntensity: 0.3
           }),
           silver: new THREE.MeshStandardMaterial({
-            color: 0xc0c0c0, metalness: 1, roughness: 0.1,
-            envMapIntensity: 2, emissive: 0x333333, emissiveIntensity: 0.2
+            color: 0xe8e8e8, metalness: 0.95, roughness: 0.1,
+            envMapIntensity: 1.8, emissive: 0x222222, emissiveIntensity: 0.15
           }),
           green: new THREE.MeshStandardMaterial({
-            color: 0x1a5c1a, metalness: 0.3, roughness: 0.6,
-            emissive: 0x0a3a0a, emissiveIntensity: 0.3
+            color: 0x228b22, metalness: 0.2, roughness: 0.7,
+            emissive: 0x0a2a0a, emissiveIntensity: 0.2
           }),
           darkGreen: new THREE.MeshStandardMaterial({
-            color: 0x0d3d0d, metalness: 0.2, roughness: 0.8,
-            emissive: 0x002200, emissiveIntensity: 0.2
+            color: 0x145214, metalness: 0.15, roughness: 0.8,
+            emissive: 0x001a00, emissiveIntensity: 0.15
           }),
           red: new THREE.MeshPhysicalMaterial({
-            color: 0xdc143c, metalness: 0.4, roughness: 0.2,
-            clearcoat: 1, emissive: 0x440000, emissiveIntensity: 0.3
+            color: 0xcc2233, metalness: 0.3, roughness: 0.25,
+            clearcoat: 0.8, emissive: 0x330000, emissiveIntensity: 0.2
           }),
           blue: new THREE.MeshPhysicalMaterial({
-            color: 0x4169e1, metalness: 0.4, roughness: 0.2,
-            clearcoat: 1, emissive: 0x000044, emissiveIntensity: 0.3
+            color: 0x3366cc, metalness: 0.3, roughness: 0.25,
+            clearcoat: 0.8, emissive: 0x000033, emissiveIntensity: 0.2
           }),
           purple: new THREE.MeshPhysicalMaterial({
-            color: 0x9932cc, metalness: 0.4, roughness: 0.2,
-            clearcoat: 1, emissive: 0x220033, emissiveIntensity: 0.3
+            color: 0x8844aa, metalness: 0.3, roughness: 0.25,
+            clearcoat: 0.8, emissive: 0x110022, emissiveIntensity: 0.2
           }),
           white: new THREE.MeshStandardMaterial({
-            color: 0xffffff, metalness: 0.1, roughness: 0.3,
-            emissive: 0x444444, emissiveIntensity: 0.2
+            color: 0xffffff, metalness: 0.05, roughness: 0.4,
+            emissive: 0x333333, emissiveIntensity: 0.15
           }),
-          candy: new THREE.MeshStandardMaterial({ map: candyTex, roughness: 0.3 }),
+          candy: new THREE.MeshStandardMaterial({ map: candyTex, roughness: 0.35 }),
         }
 
-        // 创建粒子 - 更多种类
+        // 创建粒子 - 优化比例分布
         for (let i = 0; i < CONFIG.particles.count; i++) {
           const rand = Math.random()
           let mesh, type
 
-          if (rand < 0.25) {
-            // 绿色方块 - 树叶
-            mesh = new THREE.Mesh(boxGeo, Math.random() > 0.5 ? materials.green : materials.darkGreen)
+          if (rand < 0.35) {
+            // 绿色方块 - 树叶（更多）
+            mesh = new THREE.Mesh(boxGeo, Math.random() > 0.4 ? materials.green : materials.darkGreen)
             type = 'LEAF'
-          } else if (rand < 0.40) {
+          } else if (rand < 0.48) {
             // 金色球 - 装饰球
             mesh = new THREE.Mesh(sphereGeo, materials.gold)
             type = 'GOLD_BALL'
-          } else if (rand < 0.50) {
+          } else if (rand < 0.56) {
             // 银色球
             mesh = new THREE.Mesh(sphereGeo, materials.silver)
             type = 'SILVER_BALL'
-          } else if (rand < 0.60) {
+          } else if (rand < 0.66) {
             // 红色球
             mesh = new THREE.Mesh(sphereGeo, materials.red)
             type = 'RED_BALL'
-          } else if (rand < 0.68) {
+          } else if (rand < 0.74) {
             // 蓝色球
             mesh = new THREE.Mesh(sphereGeo, materials.blue)
             type = 'BLUE_BALL'
-          } else if (rand < 0.75) {
+          } else if (rand < 0.80) {
             // 紫色球
             mesh = new THREE.Mesh(sphereGeo, materials.purple)
             type = 'PURPLE_BALL'
-          } else if (rand < 0.82) {
+          } else if (rand < 0.86) {
             // 金色钻石
             mesh = new THREE.Mesh(diamondGeo, materials.gold)
             type = 'DIAMOND'
-          } else if (rand < 0.88) {
+          } else if (rand < 0.92) {
             // 白色雪花点
             mesh = new THREE.Mesh(sphereGeo, materials.white)
             type = 'SNOW'
-          } else if (rand < 0.94) {
+          } else if (rand < 0.96) {
             // 小锥形 - 像小铃铛
             mesh = new THREE.Mesh(coneGeo, materials.gold)
             type = 'BELL'
@@ -1099,37 +1101,37 @@
             type = 'CANE'
           }
 
-          const s = 0.3 + Math.random() * 0.5
+          const s = 0.25 + Math.random() * 0.4  // 稍微小一点更精致
           mesh.scale.set(s, s, s)
           mesh.rotation.set(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2)
           mainGroup.add(mesh)
           particleSystem.push(new Particle(mesh, type))
         }
 
-        // 顶部星星 - 更闪亮
-        const starGeo = new THREE.OctahedronGeometry(1.5, 0)
+        // 顶部星星 - 精致闪亮
+        const starGeo = new THREE.OctahedronGeometry(1.2, 0)
         const starMat = new THREE.MeshStandardMaterial({
-          color: 0xffee88, 
+          color: 0xffee99, 
           emissive: 0xffaa00, 
-          emissiveIntensity: 0.6,
-          metalness: 1, 
-          roughness: 0.1
+          emissiveIntensity: 0.5,
+          metalness: 0.9, 
+          roughness: 0.15
         })
-        const star = new THREE.Mesh(starGeo, starMat)
-        star.position.y = CONFIG.particles.treeHeight / 2 + 2
-        star.rotation.y = Math.PI / 4
-        mainGroup.add(star)
+        topStar = new THREE.Mesh(starGeo, starMat)
+        topStar.position.y = CONFIG.particles.treeHeight / 2 + 1.5
+        topStar.rotation.y = Math.PI / 4
+        mainGroup.add(topStar)
 
-        // 添加星星光晕
-        const glowGeo = new THREE.SphereGeometry(1.2, 16, 16)
+        // 添加星星光晕 - 更小更柔和
+        const glowGeo = new THREE.SphereGeometry(0.8, 16, 16)
         const glowMat = new THREE.MeshBasicMaterial({
-          color: 0xffcc33,
+          color: 0xffdd66,
           transparent: true,
-          opacity: 0.08
+          opacity: 0.06
         })
-        const glow = new THREE.Mesh(glowGeo, glowMat)
-        glow.position.y = CONFIG.particles.treeHeight / 2 + 2
-        mainGroup.add(glow)
+        topGlow = new THREE.Mesh(glowGeo, glowMat)
+        topGlow.position.y = CONFIG.particles.treeHeight / 2 + 1.5
+        mainGroup.add(topGlow)
 
         mainGroup.add(photoMeshGroup)
       }
@@ -1433,6 +1435,13 @@
 
         mainGroup.rotation.y = STATE.rotation.y
         mainGroup.rotation.x = STATE.rotation.x
+
+        // FOCUS 模式下隐藏顶部星星、光晕和内部灯光
+        const isFocus = STATE.mode === 'FOCUS'
+        if (topStar) topStar.visible = !isFocus
+        if (topGlow) topGlow.visible = !isFocus
+        if (innerLight) innerLight.visible = !isFocus
+        if (starLight) starLight.visible = !isFocus
 
         // 使用 for 循环代替 forEach 提升性能
         const len = particleSystem.length

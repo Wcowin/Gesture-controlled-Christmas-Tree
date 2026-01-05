@@ -719,18 +719,19 @@
       // ========== 配置 ==========
       const CONFIG = {
         colors: {
-          bg: 0x0a0a12,  // 稍微偏蓝的深色背景
+          bg: 0x0a0a12,
           gold: 0xffd700,
           darkGreen: 0x0d3d0d,
           red: 0xdc143c,
         },
         particles: {
-          count: 1000,      // 适当减少，让树形更清晰
-          dustCount: 1200,  // 减少灰尘，避免杂乱
-          treeHeight: 22,   // 稍微矮一点更紧凑
-          treeRadius: 7,    // 稍微窄一点更优雅
+          count: 1500,      // 更多粒子让树更饱满
+          dustCount: 600,   // 减少灰尘
+          treeHeight: 28,   // 更高的树
+          treeRadius: 10,   // 更宽的底部
+          layers: 14,       // 更多层次
         },
-        camera: { z: 45 },  // 拉近一点
+        camera: { z: 52 },
         gesture: {
           fistThreshold: 0.18,
           pinchThreshold: 0.08,
@@ -830,41 +831,41 @@
       }
 
       function setupLights() {
-        // 环境光 - 稍微暗一点让对比更强
-        scene.add(new THREE.AmbientLight(0xffffff, 0.3))
+        // 环境光
+        scene.add(new THREE.AmbientLight(0xffffff, 0.5))
 
-        // 树内部暖光 - 柔和一些
-        innerLight = new THREE.PointLight(0xffaa00, 2, 25)
-        innerLight.position.set(0, 4, 0)
+        // 树内部暖光
+        innerLight = new THREE.PointLight(0xffaa00, 2.5, 30)
+        innerLight.position.set(0, 3, 0)
         mainGroup.add(innerLight)
 
-        // 顶部星星光 - 柔和
-        starLight = new THREE.PointLight(0xffdd00, 0.8, 8)
-        starLight.position.set(0, CONFIG.particles.treeHeight / 2 + 2, 0)
+        // 顶部星星光
+        starLight = new THREE.PointLight(0xffdd00, 1.2, 12)
+        starLight.position.set(0, CONFIG.particles.treeHeight / 2 + 1.5, 0)
         mainGroup.add(starLight)
 
         // 主聚光灯 - 金色，从右上方照射
-        const spotGold = new THREE.SpotLight(0xffcc66, 1200)
-        spotGold.position.set(25, 40, 35)
+        const spotGold = new THREE.SpotLight(0xffcc66, 1500)
+        spotGold.position.set(30, 45, 40)
         spotGold.angle = 0.5
-        spotGold.penumbra = 0.7
+        spotGold.penumbra = 0.6
         scene.add(spotGold)
 
-        // 侧面冷光 - 蓝紫色，增加层次感
-        const spotBlue = new THREE.SpotLight(0x6688ff, 500)
-        spotBlue.position.set(-30, 20, -25)
+        // 侧面冷光 - 蓝色，增加层次感
+        const spotBlue = new THREE.SpotLight(0x6688ff, 600)
+        spotBlue.position.set(-35, 25, -30)
         spotBlue.angle = 0.6
-        spotBlue.penumbra = 0.6
+        spotBlue.penumbra = 0.5
         scene.add(spotBlue)
 
-        // 背面补光 - 暖红色轮廓光
-        const backLight = new THREE.SpotLight(0xff8866, 300)
-        backLight.position.set(0, 8, -35)
+        // 背面补光
+        const backLight = new THREE.SpotLight(0xff8866, 400)
+        backLight.position.set(0, 10, -40)
         scene.add(backLight)
 
-        // 正面柔光 - 让正面细节可见
-        const frontLight = new THREE.DirectionalLight(0xfff8f0, 0.6)
-        frontLight.position.set(0, 8, 45)
+        // 正面柔光
+        const frontLight = new THREE.DirectionalLight(0xfff8f0, 0.8)
+        frontLight.position.set(0, 10, 50)
         scene.add(frontLight)
       }
 
@@ -874,9 +875,9 @@
           new THREE.Vector2(window.innerWidth, window.innerHeight),
           1.5, 0.4, 0.85
         )
-        bloomPass.threshold = 0.6   // 提高阈值，只让最亮的发光
-        bloomPass.strength = 0.5    // 降低强度，更柔和
-        bloomPass.radius = 0.4      // 缩小半径，更精致
+        bloomPass.threshold = 0.55
+        bloomPass.strength = 0.6
+        bloomPass.radius = 0.5
 
         composer = new EffectComposer(renderer)
         composer.addPass(renderScene)
@@ -904,15 +905,36 @@
 
         calculatePositions() {
           const h = CONFIG.particles.treeHeight
-          let t = Math.pow(Math.random(), 0.8)
+          const baseR = CONFIG.particles.treeRadius
+          
+          // 经典圣诞树锥形分布
+          // t=0 是底部，t=1 是顶部
+          let t = Math.pow(Math.random(), 0.6)  // 底部更密集
           const y = t * h - h / 2
-          let rMax = CONFIG.particles.treeRadius * (1.0 - t)
-          if (rMax < 0.5) rMax = 0.5
-          const angle = t * 50 * Math.PI + Math.random() * Math.PI
-          const r = rMax * (0.8 + Math.random() * 0.4)
-          this.posTree.set(Math.cos(angle) * r, y, Math.sin(angle) * r)
+          
+          // 锥形半径：底部大，顶部尖
+          // 使用平滑的锥形曲线
+          const coneRadius = baseR * (1.0 - t * 0.92)
+          
+          // 添加一些随机变化让树更自然
+          const radiusNoise = 0.8 + Math.random() * 0.4
+          let r = coneRadius * radiusNoise
+          if (r < 0.2) r = 0.2
+          
+          // 圆周分布
+          const angle = Math.random() * Math.PI * 2
+          
+          // 轻微的垂直抖动
+          const yNoise = (Math.random() - 0.5) * 0.8
+          
+          this.posTree.set(
+            Math.cos(angle) * r, 
+            y + yNoise, 
+            Math.sin(angle) * r
+          )
 
-          const rScatter = this.isDust ? 12 + Math.random() * 20 : 8 + Math.random() * 12
+          // 散开模式的位置
+          const rScatter = this.isDust ? 15 + Math.random() * 18 : 10 + Math.random() * 14
           const theta = Math.random() * Math.PI * 2
           const phi = Math.acos(2 * Math.random() - 1)
           this.posScatter.set(
@@ -989,6 +1011,11 @@
         const diamondGeo = new THREE.OctahedronGeometry(0.4, 0)
         const coneGeo = new THREE.ConeGeometry(0.3, 0.6, 8)
         
+        // 改进的叶子形状 - 使用扁平三角形更自然
+        const leafGeo = new THREE.ConeGeometry(0.4, 0.3, 6, 1, true)
+        // 树针形状 - 细长的锥形
+        const needleGeo = new THREE.ConeGeometry(0.15, 0.5, 8)
+        
         // 糖果棒
         const curve = new THREE.CatmullRomCurve3([
           new THREE.Vector3(0, -0.5, 0),
@@ -1054,44 +1081,67 @@
           candy: new THREE.MeshStandardMaterial({ map: candyTex, roughness: 0.35 }),
         }
 
-        // 创建粒子 - 优化比例分布
+        // 创建树干
+        const trunkGeo = new THREE.CylinderGeometry(0.8, 1.0, 3, 8)
+        const trunkMat = new THREE.MeshStandardMaterial({
+          color: 0x654321,
+          metalness: 0.1,
+          roughness: 0.9,
+          emissive: 0x1a0f00,
+          emissiveIntensity: 0.1
+        })
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat)
+        trunk.position.y = -CONFIG.particles.treeHeight / 2 - 1.5
+        mainGroup.add(trunk)
+
+        // 创建粒子 - 改进的分布：叶子更多样化，装饰品更均匀
         for (let i = 0; i < CONFIG.particles.count; i++) {
           const rand = Math.random()
           let mesh, type
 
-          if (rand < 0.35) {
-            // 绿色方块 - 树叶（更多）
-            mesh = new THREE.Mesh(boxGeo, Math.random() > 0.4 ? materials.green : materials.darkGreen)
+          if (rand < 0.40) {
+            // 改进的叶子 - 使用三角形和扁平锥形，更自然
+            const leafRand = Math.random()
+            if (leafRand < 0.5) {
+              // 扁平三角形叶子
+              mesh = new THREE.Mesh(leafGeo, Math.random() > 0.5 ? materials.green : materials.darkGreen)
+            } else if (leafRand < 0.8) {
+              // 细长树针
+              mesh = new THREE.Mesh(needleGeo, materials.darkGreen)
+            } else {
+              // 保留一些方块作为点缀
+              mesh = new THREE.Mesh(boxGeo, materials.green)
+            }
             type = 'LEAF'
-          } else if (rand < 0.48) {
-            // 金色球 - 装饰球
+          } else if (rand < 0.52) {
+            // 金色球 - 装饰球（主要装饰）
             mesh = new THREE.Mesh(sphereGeo, materials.gold)
             type = 'GOLD_BALL'
-          } else if (rand < 0.56) {
+          } else if (rand < 0.58) {
             // 银色球
             mesh = new THREE.Mesh(sphereGeo, materials.silver)
             type = 'SILVER_BALL'
-          } else if (rand < 0.66) {
+          } else if (rand < 0.68) {
             // 红色球
             mesh = new THREE.Mesh(sphereGeo, materials.red)
             type = 'RED_BALL'
-          } else if (rand < 0.74) {
+          } else if (rand < 0.76) {
             // 蓝色球
             mesh = new THREE.Mesh(sphereGeo, materials.blue)
             type = 'BLUE_BALL'
-          } else if (rand < 0.80) {
+          } else if (rand < 0.82) {
             // 紫色球
             mesh = new THREE.Mesh(sphereGeo, materials.purple)
             type = 'PURPLE_BALL'
-          } else if (rand < 0.86) {
+          } else if (rand < 0.88) {
             // 金色钻石
             mesh = new THREE.Mesh(diamondGeo, materials.gold)
             type = 'DIAMOND'
-          } else if (rand < 0.92) {
+          } else if (rand < 0.93) {
             // 白色雪花点
             mesh = new THREE.Mesh(sphereGeo, materials.white)
             type = 'SNOW'
-          } else if (rand < 0.96) {
+          } else if (rand < 0.97) {
             // 小锥形 - 像小铃铛
             mesh = new THREE.Mesh(coneGeo, materials.gold)
             type = 'BELL'
@@ -1101,9 +1151,28 @@
             type = 'CANE'
           }
 
-          const s = 0.25 + Math.random() * 0.4  // 稍微小一点更精致
+          // 根据类型调整大小：叶子稍小，装饰品稍大
+          let s
+          if (type === 'LEAF') {
+            s = 0.3 + Math.random() * 0.35  // 叶子稍小
+          } else if (type === 'SNOW') {
+            s = 0.15 + Math.random() * 0.2  // 雪花最小
+          } else {
+            s = 0.3 + Math.random() * 0.5  // 装饰品稍大更明显
+          }
           mesh.scale.set(s, s, s)
-          mesh.rotation.set(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2)
+          
+          // 叶子保持垂直向上，装饰品随机旋转
+          if (type === 'LEAF') {
+            mesh.rotation.set(
+              (Math.random() - 0.5) * 0.5,  // 轻微的倾斜
+              Math.random() * Math.PI * 2,   // 随机朝向
+              (Math.random() - 0.5) * 0.5
+            )
+          } else {
+            mesh.rotation.set(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2)
+          }
+          
           mainGroup.add(mesh)
           particleSystem.push(new Particle(mesh, type))
         }
